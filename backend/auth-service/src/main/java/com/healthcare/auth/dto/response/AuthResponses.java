@@ -1,0 +1,51 @@
+package com.healthcare.auth.dto.response;
+
+import com.healthcare.auth.entity.Role;
+import lombok.Builder;
+import lombok.Data;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+public class AuthResponses {
+
+    @Data
+    @Builder
+    public static class AuthResponse {
+        private String accessToken;
+        private String refreshToken;
+        @Builder.Default
+        private String tokenType = "Bearer";
+        private long expiresIn;
+        private UserInfo user;
+    }
+
+    @Data
+    @Builder
+    public static class UserInfo {
+        private UUID id;
+        private String username;
+        private String email;
+        private String firstName;
+        private String lastName;
+        private Role role;
+        private LocalDateTime createdAt;
+    }
+
+    @Data
+    @Builder
+    public static class TokenValidationResponse {
+        private boolean valid;
+        private UUID userId;
+        private String username;
+        private String email;
+        private Role role;
+    }
+
+    @Data
+    @Builder
+    public static class MessageResponse {
+        private String message;
+        private boolean success;
+    }
+}

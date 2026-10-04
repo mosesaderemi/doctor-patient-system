@@ -1,0 +1,194 @@
+package com.healthcare.auth;
+
+import com.healthcare.auth.dto.request.AuthRequests.*;
+import com.healthcare.auth.dto.response.AuthResponses.*;
+import com.healthcare.auth.entity.RefreshToken;
+import com.healthcare.auth.entity.Role;
+import com.healthcare.auth.entity.User;
+import com.healthcare.auth.exception.AuthException;
+import com.healthcare.auth.repository.RefreshTokenRepository;
+import com.healthcare.auth.repository.UserRepository;
+import com.healthcare.auth.security.JwtService;
+import com.healthcare.auth.service.AuthService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("AuthService Tests")
+class AuthServiceTest {
+
+    @Mock private UserRepository userRepository;
+    @Mock private RefreshTokenRepository refreshTokenRepository;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private JwtService jwtService;
+    @Mock private AuthenticationManager authenticationManager;
+
+    @InjectMocks
+    private AuthService authService;
+
+    private User testUser;
+
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(authService, "refreshTokenExpiration", 604800000L);
+        testUser = User.builder()
+                .id(UUID.randomUUID())
+                .username("testuser")
+                .email("test@example.com")
+                .password("encodedPassword")
+                .firstName("Test")
+                .lastName("User")
+                .role(Role.PATIENT)
+                .build();
+    }
+
+    @Test
+    @DisplayName("Should register a new user successfully")
+    void register_ShouldCreateUser_WhenValidRequest() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("newuser");
+        request.setEmail("new@example.com");
+        request.setPassword("Password@123");
+        request.setFirstName("New");
+        request.setLastName("User");
+        request.setRole(Role.PATIENT);
+
+        when(userRepository.existsByUsername("newuser")).thenReturn(false);
+        when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
+        when(userRepository.save(any(User.class))).thenReturn(testUser);
+        when(jwtService.generateToken(any())).thenReturn("accessToken");
+        when(jwtService.generateRefreshToken(any())).thenReturn("refreshToken");
+        when(jwtService.getJwtExpiration()).thenReturn(900000L);
+        when(refreshTokenRepository.save(any())).thenReturn(mock(RefreshToken.class));
+
+        AuthResponse response = authService.register(request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getAccessToken()).isEqualTo("accessToken");
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    @DisplayName("Should throw exception when username is taken")
+    void register_ShouldThrow_WhenUsernameExists() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("existinguser");
+        request.setEmail("new@example.com");
+        request.setPassword("Password@123");
+        request.setFirstName("Test");
+        request.setLastName("User");
+        request.setRole(Role.PATIENT);
+
+        when(userRepository.existsByUsername("existinguser")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.register(request))
+                .isInstanceOf(AuthException.class)
+                .hasMessageContaining("Username already taken");
+    }
+
+    @Test
+    @DisplayName("Should login successfully with valid credentials")
+    void login_ShouldReturnTokens_WhenValidCredentials() {
+        LoginRequest request = new LoginRequest();
+        request.setUsernameOrEmail("testuser");
+        request.setPassword("Password@123");
+
+        when(authenticationManager.authenticate(any())).thenReturn(
+                new UsernamePasswordAuthenticationToken("testuser", "Password@123"));
+        when(userRepository.findByUsernameOrEmail(anyString(), anyString()))
+                .thenReturn(Optional.of(testUser));
+        when(jwtService.generateToken(any())).thenReturn("accessToken");
+        when(jwtService.generateRefreshToken(any())).thenReturn("refreshToken");
+        when(jwtService.getJwtExpiration()).thenReturn(900000L);
+        when(refreshTokenRepository.save(any())).thenReturn(mock(RefreshToken.class));
+
+        AuthResponse response = authService.login(request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getAccessToken()).isNotNull();
+        verify(refreshTokenRepository).revokeAllUserTokens(testUser);
+    }
+
+    @Test
+    @DisplayName("Should throw AuthException when credentials are invalid")
+    void login_ShouldThrow_WhenInvalidCredentials() {
+        LoginRequest request = new LoginRequest();
+        request.setUsernameOrEmail("testuser");
+        request.setPassword("wrongpassword");
+
+        when(authenticationManager.authenticate(any()))
+                .thenThrow(new BadCredentialsException("Bad credentials"));
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("Invalid credentials");
+    }
+
+    @Test
+    @DisplayName("Should validate a valid token successfully")
+    void validateToken_ShouldReturnValid_WhenTokenIsValid() {
+        when(jwtService.isTokenValid("validToken")).thenReturn(true);
+        when(jwtService.extractUsername("validToken")).thenReturn("testuser");
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+
+        TokenValidationResponse response = authService.validateToken("validToken");
+
+        assertThat(response.isValid()).isTrue();
+        assertThat(response.getUsername()).isEqualTo("testuser");
+        assertThat(response.getRole()).isEqualTo(Role.PATIENT);
+    }
+
+    @Test
+    @DisplayName("Should return invalid for expired token")
+    void validateToken_ShouldReturnInvalid_WhenTokenExpired() {
+        when(jwtService.isTokenValid("expiredToken")).thenReturn(false);
+
+        TokenValidationResponse response = authService.validateToken("expiredToken");
+
+        assertThat(response.isValid()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should refresh token when valid refresh token provided")
+    void refreshToken_ShouldReturnNewTokens_WhenValidRefreshToken() {
+        RefreshTokenRequest request = new RefreshTokenRequest();
+        request.setRefreshToken("validRefreshToken");
+
+        RefreshToken storedToken = RefreshToken.builder()
+                .token("validRefreshToken")
+                .user(testUser)
+                .expiryDate(Instant.now().plusSeconds(3600))
+                .revoked(false)
+                .build();
+
+        when(refreshTokenRepository.findByToken("validRefreshToken")).thenReturn(Optional.of(storedToken));
+        when(jwtService.generateToken(any())).thenReturn("newAccessToken");
+        when(jwtService.generateRefreshToken(any())).thenReturn("newRefreshToken");
+        when(jwtService.getJwtExpiration()).thenReturn(900000L);
+        when(refreshTokenRepository.save(any())).thenReturn(mock(RefreshToken.class));
+
+        AuthResponse response = authService.refreshToken(request);
+
+        assertThat(response.getAccessToken()).isEqualTo("newAccessToken");
+        assertThat(storedToken.isRevoked()).isTrue();
+    }
+}

@@ -1,0 +1,48 @@
+package com.healthcare.billing.dto.request;
+
+import com.healthcare.billing.entity.PaymentMethod;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+public class BillingRequests {
+
+    @Data
+    public static class CreateInvoiceRequest {
+        @NotNull private UUID patientId;
+        private UUID appointmentId;
+        private String appointmentNumber;
+        private UUID doctorId;
+        private String doctorName;
+        @NotBlank private String department;
+        @NotNull private LocalDate invoiceDate;
+        @NotNull private LocalDate dueDate;
+        @NotNull @DecimalMin("0.0") private BigDecimal taxRate;
+        private String insuranceProvider;
+        @DecimalMin("0.0") private BigDecimal insuranceCoverage;
+        private String notes;
+        @NotEmpty @Valid
+        private List<LineItemRequest> lineItems;
+    }
+
+    @Data
+    public static class LineItemRequest {
+        @NotBlank private String description;
+        @NotBlank private String serviceCode;
+        @Min(1) private Integer quantity;
+        @NotNull @DecimalMin("0.01") private BigDecimal unitPrice;
+    }
+
+    @Data
+    public static class RecordPaymentRequest {
+        @NotNull @DecimalMin("0.01") private BigDecimal amount;
+        @NotNull private PaymentMethod method;
+        private String transactionId;
+        private String notes;
+    }
+}

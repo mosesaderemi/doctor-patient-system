@@ -1,0 +1,123 @@
+package com.healthcare.doctor.controller;
+
+import com.healthcare.doctor.dto.request.DoctorRequests.*;
+import com.healthcare.doctor.dto.response.DoctorResponses.*;
+import com.healthcare.doctor.entity.DoctorStatus;
+import com.healthcare.doctor.service.DoctorService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1/doctors")
+@CrossOrigin(origins = "http://localhost:3000")
+@RequiredArgsConstructor
+@SecurityRequirement(name = "bearerAuth")
+@Tag(name = "Doctors", description = "Doctor management APIs")
+public class DoctorController {
+
+    private final DoctorService doctorService;
+
+    @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    public ResponseEntity<DoctorResponse> createDoctor(@Valid @RequestBody CreateDoctorRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(doctorService.createDoctor(request));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'PATIENT')")
+    public ResponseEntity<DoctorResponse> getDoctorById(@PathVariable UUID id) {
+        return ResponseEntity.ok(doctorService.getDoctorById(id));
+    }
+
+    @GetMapping("/user/{userId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    public ResponseEntity<DoctorResponse> getDoctorByUserId(@PathVariable UUID userId) {
+        return ResponseEntity.ok(doctorService.getDoctorByUserId(userId));
+    }
+
+    @GetMapping("/code/{code}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE')")
+    public ResponseEntity<DoctorResponse> getDoctorByCode(@PathVariable String code) {
+        return ResponseEntity.ok(doctorService.getDoctorByCode(code));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'PATIENT')")
+    public ResponseEntity<Page<DoctorResponse>> getAllDoctors(
+            @PageableDefault(size = 20, sort = "lastName") Pageable pageable) {
+        return ResponseEntity.ok(doctorService.getAllDoctors(pageable));
+    }
+
+    @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'PATIENT')")
+    public ResponseEntity<Page<DoctorResponse>> searchDoctors(
+            @RequestParam String query,
+            @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(doctorService.searchDoctors(query, pageable));
+    }
+
+    @GetMapping("/department/{department}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'PATIENT')")
+    public ResponseEntity<Page<DoctorResponse>> getByDepartment(
+            @PathVariable String department,
+            @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(doctorService.getDoctorsByDepartment(department, pageable));
+    }
+
+    @GetMapping("/department/{department}/active")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'PATIENT')")
+    public ResponseEntity<List<DoctorSummaryResponse>> getActiveDoctorsByDepartment(@PathVariable String department) {
+        return ResponseEntity.ok(doctorService.getActiveDoctorsByDepartment(department));
+    }
+
+    @GetMapping("/specialization/{specialization}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'PATIENT')")
+    public ResponseEntity<Page<DoctorResponse>> getBySpecialization(
+            @PathVariable String specialization,
+            @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(doctorService.getDoctorsBySpecialization(specialization, pageable));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    public ResponseEntity<DoctorResponse> updateDoctor(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateDoctorRequest request) {
+        return ResponseEntity.ok(doctorService.updateDoctor(id, request));
+    }
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<DoctorResponse> updateDoctorStatus(
+            @PathVariable UUID id,
+            @RequestParam DoctorStatus status) {
+        return ResponseEntity.ok(doctorService.updateDoctorStatus(id, status));
+    }
+
+    @PostMapping("/{id}/ratings")
+    @PreAuthorize("hasRole('PATIENT')")
+    public ResponseEntity<DoctorResponse> submitRating(
+            @PathVariable UUID id,
+            @Valid @RequestBody RatingRequest request) {
+        return ResponseEntity.ok(doctorService.submitRating(id, request));
+    }
+
+    @GetMapping("/stats")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<DoctorStatsResponse> getStats() {
+        return ResponseEntity.ok(doctorService.getStats());
+    }
+}

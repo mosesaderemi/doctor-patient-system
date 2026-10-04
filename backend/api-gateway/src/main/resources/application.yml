@@ -1,0 +1,156 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:3000"
+              - "http://localhost:5173"
+              - "${FRONTEND_URL:http://localhost:3000}"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+      routes:
+        # ── Auth Service ────────────────────────────────────────────────
+        - id: auth-service
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/v1/auth/**
+
+        # ── Patient Service ─────────────────────────────────────────────
+        - id: patient-service
+          uri: lb://patient-service
+          predicates:
+            - Path=/api/v1/patients/**
+
+        # ── Doctor Service ──────────────────────────────────────────────
+        - id: doctor-service
+          uri: lb://doctor-service
+          predicates:
+            - Path=/api/v1/doctors/**
+
+        # ── Appointment Service ─────────────────────────────────────────
+        - id: appointment-service
+          uri: lb://appointment-service
+          predicates:
+            - Path=/api/v1/appointments/**
+
+        # ── Prescription Service ────────────────────────────────────────
+        - id: prescription-service
+          uri: lb://prescription-service
+          predicates:
+            - Path=/api/v1/prescriptions/**
+
+        # ── Billing Service ─────────────────────────────────────────────
+        - id: billing-service
+          uri: lb://billing-service
+          predicates:
+            - Path=/api/v1/billing/**
+
+        # ── Notification Service ────────────────────────────────────────
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/v1/notifications/**
+
+        # ── Swagger UI aggregation ──────────────────────────────────────
+        - id: auth-service-docs
+          uri: lb://auth-service
+          predicates:
+            - Path=/auth-service/v3/api-docs
+          filters:
+            - RewritePath=/auth-service/v3/api-docs, /v3/api-docs
+
+        - id: patient-service-docs
+          uri: lb://patient-service
+          predicates:
+            - Path=/patient-service/v3/api-docs
+          filters:
+            - RewritePath=/patient-service/v3/api-docs, /v3/api-docs
+
+        - id: doctor-service-docs
+          uri: lb://doctor-service
+          predicates:
+            - Path=/doctor-service/v3/api-docs
+          filters:
+            - RewritePath=/doctor-service/v3/api-docs, /v3/api-docs
+
+        - id: appointment-service-docs
+          uri: lb://appointment-service
+          predicates:
+            - Path=/appointment-service/v3/api-docs
+          filters:
+            - RewritePath=/appointment-service/v3/api-docs, /v3/api-docs
+
+        - id: prescription-service-docs
+          uri: lb://prescription-service
+          predicates:
+            - Path=/prescription-service/v3/api-docs
+          filters:
+            - RewritePath=/prescription-service/v3/api-docs, /v3/api-docs
+
+        - id: billing-service-docs
+          uri: lb://billing-service
+          predicates:
+            - Path=/billing-service/v3/api-docs
+          filters:
+            - RewritePath=/billing-service/v3/api-docs, /v3/api-docs
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URI:http://localhost:8761}/eureka/
+  instance:
+    prefer-ip-address: true
+
+application:
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,gateway
+  endpoint:
+    gateway:
+      enabled: true
+    health:
+      show-details: always
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: Auth Service
+        url: /auth-service/v3/api-docs
+      - name: Patient Service
+        url: /patient-service/v3/api-docs
+      - name: Doctor Service
+        url: /doctor-service/v3/api-docs
+      - name: Appointment Service
+        url: /appointment-service/v3/api-docs
+      - name: Prescription Service
+        url: /prescription-service/v3/api-docs
+      - name: Billing Service
+        url: /billing-service/v3/api-docs
+
+logging:
+  level:
+    com.healthcare.gateway: DEBUG
+    org.springframework.cloud.gateway: INFO
