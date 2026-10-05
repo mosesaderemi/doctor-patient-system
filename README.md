@@ -123,7 +123,7 @@ The authentication service migration (`V1__init_auth_schema.sql`) creates an adm
 
 Aderemi Moses Timileyin
 GitHub: [@mosesaderemi](https://github.com/mosesaderemi)
-LinkedIn: [linkedin.com/in/mosesaderemi-6a70a5405](https://www.linkedin.com/in/mosesaderemi-6a70a5405)
+LinkedIn: [linkedin.com/in/mosesaderemi-6a70a5405](https://www.linkedin.com/in/moses-aderemi-6a70a5405)
 
 ## License
 
